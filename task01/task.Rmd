@@ -1,0 +1,228 @@
+---
+title: "task"
+output: html_document
+---
+
+# Данные
+
+Загрузим и обработаем данные:
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.height=5.5, fig.width=10}
+library(XML)
+library(RCurl)
+library(forecast)
+library(tseries)
+library(lmtest)
+library(Hmisc)
+
+data <- readHTMLTable("http://sophist.hse.ru/exes/tables/WAG_M.htm", which=1)
+data <- data[c("T", "WAG_M")]
+data <- tail(head(data, -4), -1)
+data <- droplevels(data)
+rownames(data) <- 1:nrow(data)
+names(data)[1] <- "Date"
+names(data)[2] <- "Value"
+data$Value <- as.numeric(gsub(",", ".", data$Value))
+data$Date <- seq(as.Date("1993-01-01"), by="1 month", length.out=nrow(data))
+data <- droplevels(data)
+tSeries <- ts(data = data$Value, start = as.numeric(c(format(data$Date[1], "%Y"), format(data$Date[1], "%m"))), freq = 12)
+xname <- "Real salary"
+
+plot(tSeries, type="l", ylab=xname, col="red")
+grid()
+
+trainSeries <- window(tSeries, end=c(2015, 12))
+testSeries  <- window(tSeries, start=c(2016, 1))
+D <- 20
+```
+
+STL-декомпозиция ряда:
+```{r, echo=FALSE, fig.height=8, fig.width=10}
+plot(stl(tSeries, s.window="periodic"))
+```
+
+Оптимальное преобразование Бокса-Кокса и результат его применения:
+```{r, echo=FALSE, fig.width=10, fig.height=8}
+par(mfrow=c(2,1))
+plot(tSeries, ylab="Original series", xlab="", col="red")
+grid()
+
+LambdaOpt <- BoxCox.lambda(tSeries)
+plot(BoxCox(tSeries, LambdaOpt), ylab="Transformed series", xlab="", col="red")
+title(main=toString(round(LambdaOpt, 3)))
+grid()
+```
+
+Попробуем округлить параметр и взять $\lambda=-1$:
+```{r, echo=FALSE, fig.height=4, fig.width=10}
+plot(BoxCox(tSeries, -1), ylab="Transformed series", xlab="", col="red")
+title(main="-1")
+grid()
+```
+
+Результат улучшился, поэтому берем $\lambda=-1$:
+```{r, echo=FALSE, fig.height=4, fig.width=10}
+LambdaOpt <- -1
+```
+
+## ARIMA
+
+### Автоматический подбор модели
+
+Применим функцию auto.arima:
+```{r, echo=FALSE}
+fit.auto <- auto.arima(tSeries, lambda=LambdaOpt)
+fit.auto
+```
+
+Предлагается модель ARIMA(1,1,1)(1,0,0)$_{12}$. Посмотрим на её остатки:
+```{r, echo=FALSE, fig.height=4.5, fig.width=10}
+res.auto <- residuals(fit.auto)
+plot(res.auto)
+```
+
+```{r, echo=FALSE, fig.height=8, fig.width=10}
+tsdisplay(res.auto)
+```
+
+```{r, echo=FALSE}
+p <- rep(0, 1, frequency(tSeries)*3)
+for (i in 1:length(p)){
+  p[i] <- Box.test(res.auto, lag=i, type = "Ljung-Box")$p.value
+}
+plot(p, xlab="Lag", ylab="P-value", ylim=c(0,1))
+abline(h = 0.05, lty = 2, col = "blue")
+```
+
+```{r, echo=FALSE, fig.height=5.5, fig.width=10}
+par(mfrow=c(1,2))
+qqnorm(res.auto)
+qqline(res.auto, col="red")
+hist(res.auto)
+```
+
+Гипотеза           | Критерий      | Результат проверки | Достигаемый уровень значимости
+------------------ | ------------- | ------------------ | ------------------------------
+Нормальность       | Шапиро-Уилка  | отвергается        | `r shapiro.test(res.auto)$p.value`
+Несмещённость      | Уилкоксона    | отвергается        | `r wilcox.test(res.auto)$p.value`
+Стационарность     | KPSS          | не отвергается     | `r kpss.test(res.auto)$p.value`
+
+Настроив выбранную модель на обучающей выборке, посчитаем её качество на тестовой:
+```{r, echo=FALSE, fig.height=5.5, fig.width=10}
+fitShort <- Arima(trainSeries, order=c(1,1,1), seasonal=c(1,0,0), lambda=LambdaOpt)
+fc <- forecast(fitShort, h=D)
+accuracy(fc, testSeries)
+plot(forecast(fitShort, h=D), ylab=xname, xlab="Time")
+lines(tSeries, col="red")
+```
+
+### Ручной подбор модели
+
+Исходный ряд нестационарен (p<`r kpss.test(BoxCox(tSeries, LambdaOpt))$p.value`, критерий KPSS); сделаем сезонное дифференцирование:
+```{r, echo=FALSE, fig.height=5.5, fig.width=10}
+plot(diff(BoxCox(tSeries, LambdaOpt), 12), type="l", col="red")
+grid()
+```
+Для полученного ряда гипотеза стационарности не отвергается (p>`r kpss.test(diff(BoxCox(tSeries, LambdaOpt), 12))$p.value`)
+
+Посмотрим на ACF и PACF полученного продифференцированного ряда:
+```{r, echo=FALSE, fig.height=5.5, fig.width=10}
+par(mfrow=c(1,2))
+acf(diff(BoxCox(tSeries, LambdaOpt), 12), lag.max=5*12, main="")
+pacf(diff(BoxCox(tSeries, LambdaOpt), 12), lag.max=5*12, main="")
+```
+
+На ACF значимы лаги 1-12, на PACF — 1-5. 
+Поищем с помощью auto.arima оптимальную модель полным перебором (stepwise=FALSE) с ограничениями d=1, D=1, max.p=5, max.q=5, max.P=2, max.Q=2, max.order=10:
+```{r echo=F}
+fit <- auto.arima(tSeries, d=1, D=1, max.p=5, max.q=5, max.P=2, max.Q=2, max.order=10, lambda=LambdaOpt, stepwise=F)
+fit
+```
+
+Была найдена более оптимальная по AICc модель — ARIMA(0,1,4)(1,1,2)$_{12}$. Посмотрим на её остатки:
+```{r, echo=FALSE, fig.height=4.5, fig.width=10}
+res <- residuals(fit)
+plot(res)
+```
+
+```{r, echo=FALSE, fig.height=8, fig.width=10}
+tsdisplay(res)
+```
+
+Достигаемые уровни значимости критерия Льюнга-Бокса для остатков:
+```{r, echo=FALSE}
+p <- rep(0, 1, frequency(tSeries)*3)
+for (i in 1:length(p)){
+  p[i] <- Box.test(res, lag=i, type = "Ljung-Box")$p.value
+}
+plot(p, xlab="Lag", ylab="P-value", ylim=c(0,1))
+abline(h = 0.05, lty = 2, col = "blue")
+```
+
+Q-Q plot и гистограмма:
+```{r, echo=FALSE, fig.height=5.5, fig.width=10}
+par(mfrow=c(1,2))
+qqnorm(res)
+qqline(res, col="red")
+hist(res)
+```
+
+Гипотеза           | Критерий      | Результат проверки | Достигаемый уровень значимости
+------------------ | ------------- | ------------------ | ------------------------------
+Нормальность       | Шапиро-Уилка  | отвергается        | `r shapiro.test(res)$p.value`
+Несмещённость      | Уилкоксона    | не отвергается     | `r wilcox.test(res)$p.value`
+Стационарность     | KPSS          | не отвергается     | `r kpss.test(res)$p.value`
+
+Настроив выбранную модель на обучающей выборке, посчитаем её качество на тестовой:
+```{r, echo=FALSE, fig.height=5.5, fig.width=10}
+fitShort <- Arima(trainSeries, order=c(0,1,4), seasonal=c(1,1,2), lambda=LambdaOpt)
+fc <- forecast(fitShort, h=D)
+accuracy(fc, testSeries)
+plot(forecast(fitShort, h=D), ylab=xname, xlab="Time")
+lines(tSeries, col="red")
+```
+
+Сравним остатки двух версий аримы:
+```{r, echo=FALSE, fig.height=8, fig.width=8}
+res <- (tSeries - fitted(fit))
+res.auto <- (tSeries - fitted(fit.auto))
+
+plot(res, res.auto, xlim=c(min(res, res.auto), max(res, res.auto)), ylim=c(min(res, res.auto), max(res, res.auto)), 
+     xlab = "Residuals of manually found model", ylab="Residuals of auto.arima model")
+grid()
+lines(c(min(res, res.auto), max(res, res.auto))*2, c(min(res, res.auto), max(res, res.auto))*2, col="red")
+
+dm.test(res, res.auto)
+```
+Критерий Диболда-Мариано не обнаруживает значимого различия между качеством прогнозов.
+В целом подобранная автоматически модель проще, её остатки лучше, а ошибка на тесте меньше, так что остановимся на модели, подобранной автоматически.
+
+## Вопросы
+
+* **Был ли временной ряд стационарным?**
+
+  Нет.
+
+* **Какие преобразования помогли сделать его таковым?**
+
+  Дифференцирование.
+
+* **Какие параметры модели ARIMA оказались наилучшими и почему?**
+
+  (1, 1, 1) x (1, 0, 0) x [12]. Меньше ошибка на тесте.
+
+* **Получилось ли точно спрогнозировать заработную плату?**
+
+  Да.
+
+* **В каких точках прогноз получился наименее точным и почему?**
+
+  В экстремальных. Видимо, потому что сложнее всего предугадать в какой момент значение сменится во времени.
+
+## Финальный прогноз
+
+Поскольку остатки ненормальны, предсказательные интервалы строятся бутстрепом
+```{r, echo=FALSE, fig.height=5.5, fig.width=10}
+fl <- forecast(fit.auto, h=D, lambda=LambdaOpt, bootstrap=F)
+print(fl)
+plot(fl, ylab=xname, xlab="Year", col="red")
+```
