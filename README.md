@@ -7,7 +7,14 @@ Practical analytics course homework at SPbAU 7th term
 ### Prerequisites
 
 * **R**
+* **python>=3.6.2** + **pip**
+* **make** for [Makefile](Makefile)
 
 ### Dependensies
 
-See particular files.
+`make deps`
+
+## Usage
+
+`make help`  
+Also, see particular tasks for more info.
