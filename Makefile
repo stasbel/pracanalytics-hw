@@ -1,7 +1,14 @@
-### INCLUDES ###
-# ...
+# This Makefile provide some useful commands for developing and using this
+# project. Remeber, this is just for the convinience, so dont rely on them
+# too much. You can do all sort of things (including running and using code)
+# all by yourself.
+# Partially based on good style guide on creating Makefiles at
+# `http://clarkgrubb.com/makefile-style-guide`, still not following it blindly.
+# Author: Stanislav Belyaev stasbelyaev96@gmail.com
 
 ### PROLOGUE ###
+
+# Basic prologue mashinery from the Makefile style guide
 MAKEFLAGS += --warn-undefined-variables
 SHELL := bash
 .SHELLFLAGS := -eu -o pipefail -c
@@ -9,19 +16,30 @@ SHELL := bash
 .DELETE_ON_ERROR:
 .SUFFIXES:
 
-# ANSI colors.
-GREEN := $(shell tput -Txterm setaf 2)
-WHITE := $(shell tput -Txterm setaf 7)
-YELLOW := $(shell tput -Txterm setaf 3)
-RESET := $(shell tput -Txterm sgr0)
+### BODY ###
 
-define color_echo
+## INTERNAL VARIABLES ##
+
+# ANSI colors
+GREEN  := $(shell tput -Txterm setaf 2)
+WHITE  := $(shell tput -Txterm setaf 7)
+YELLOW := $(shell tput -Txterm setaf 3)
+RESET  := $(shell tput -Txterm sgr0)
+
+# Functions for printing color text
+define COLOR_ECHO
 	@echo "${$2}$1${RESET}"
 endef
+SUCCESS := $(call COLOR_ECHO,Success!,GREEN)
 
-# Add the following "help" target to your Makefile and add help text after
-# each target name starting with "##".
-# A category can be added with "@category".
+## RULES AND TARGETS ##
+
+all: help
+
+# Miscellaneous
+
+# Add the following `help` target to your Makefile and add help text after
+# each target name starting with `##`. A category can be added with `@caregory`.
 HELP_FUN := \
     %help; \
     while(<>) { push @{$$help{$$2 // 'options'}}, [$$1, $$3] if \
@@ -35,29 +53,38 @@ HELP_FUN := \
     }; \
     print "\n"; }
 
-# Consts.
-PIP_TOOL := pipenv
-REQUIREMENTS_FILE := requirements.txt
-
-# Targets.
-all: help
-
 help:	##@miscellaneous	Show this help.
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
+# Dev
+
+pip_tool := pipenv
+reqs_dev_file := requirements-dev.txt
+reqs_file := requirements.txt
+py_files := $(shell find . -name "*.py" | cut -c 3-)
+
+install:	##@dev	Install project dependencies.
+	$(pip_tool) install --dev
+
+check:	##@dev	Check project vulnerabilities and code style (pep + flake).
+	$(pip_tool) check
+	for file in $(py_files); do \
+		echo "check" $$file ; \
+		$(pip_tool) check --style $$file ; \
+	done
+	$(SUCCESS)
+
 lock:	##@dev	Lock currect env into specific files.
-	${PIP_TOOL} lock
-	${PIP_TOOL} lock -r >${REQUIREMENTS_FILE}
-	$(call color_echo,Success,GREEN)
+	$(pip_tool) lock
+	$(pip_tool) lock -r -d >$(reqs_dev_file)
+	$(pip_tool) lock -r >$(reqs_file)
+	$(SUCCESS)
 
-deps:	##@dev	Install necessary packages.
-	pipenv install
-
-check:	##@dev	Check project safety and code style.
-	pipenv check
-	pipenv check --style $(shell find . -name "*.py" | cut -c 3-)
+# Basic
 
 clean:	##@basic	Do the cleaning, removing unnecessary files.
 	rm -rf *~ \#*
 
-.PHONY: all help lock deps clean
+## PHONY TARGETS ##
+
+.PHONY: all help install check lock clean
