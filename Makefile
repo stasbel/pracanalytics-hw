@@ -1,8 +1,23 @@
+### INCLUDES ###
+# ...
+
+### PROLOGUE ###
+MAKEFLAGS += --warn-undefined-variables
+SHELL := bash
+.SHELLFLAGS := -eu -o pipefail -c
+.DEFAULT_GOAL := all
+.DELETE_ON_ERROR:
+.SUFFIXES:
+
 # ANSI colors.
-GREEN  := $(shell tput -Txterm setaf 2)
-WHITE  := $(shell tput -Txterm setaf 7)
+GREEN := $(shell tput -Txterm setaf 2)
+WHITE := $(shell tput -Txterm setaf 7)
 YELLOW := $(shell tput -Txterm setaf 3)
-RESET  := $(shell tput -Txterm sgr0)
+RESET := $(shell tput -Txterm sgr0)
+
+define color_echo
+	@echo "${$2}$1${RESET}"
+endef
 
 # Add the following "help" target to your Makefile and add help text after
 # each target name starting with "##".
@@ -21,7 +36,8 @@ HELP_FUN := \
     print "\n"; }
 
 # Consts.
-REQS_FILE := requirements.txt
+PIP_TOOL := pipenv
+REQUIREMENTS_FILE := requirements.txt
 
 # Targets.
 all: help
@@ -29,13 +45,19 @@ all: help
 help:	##@miscellaneous	Show this help.
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
-freeze:	##@basic	Place venv packages into reqs file.
-	pip freeze >${REQS_FILE}
+lock:	##@dev	Lock currect env into specific files.
+	${PIP_TOOL} lock
+	${PIP_TOOL} lock -r >${REQUIREMENTS_FILE}
+	$(call color_echo,Success,GREEN)
 
-deps:	##@basic	Install necessary packages.
-	pip install -r ${REQS_FILE}
+deps:	##@dev	Install necessary packages.
+	pipenv install
+
+check:	##@dev	Check project safety and code style.
+	pipenv check
+	pipenv check --style $(shell find . -name "*.py" | cut -c 3-)
 
 clean:	##@basic	Do the cleaning, removing unnecessary files.
 	rm -rf *~ \#*
 
-.PHONY: all help freeze deps clean
+.PHONY: all help lock deps clean
