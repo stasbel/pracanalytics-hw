@@ -8,6 +8,11 @@ name = "pypi"
 [packages]
 
 jupyter = "*"
+requests = "*"
+pandas = "*"
+matplotlib = "*"
+seaborn = "*"
+statsmodels = "*"
 
 
 [dev-packages]
