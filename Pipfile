@@ -13,6 +13,7 @@ pandas = "*"
 matplotlib = "*"
 seaborn = "*"
 statsmodels = "*"
+"rpy2" = "*"
 
 
 [dev-packages]
