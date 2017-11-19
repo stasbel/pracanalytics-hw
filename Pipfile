@@ -14,6 +14,7 @@ matplotlib = "*"
 seaborn = "*"
 statsmodels = "*"
 "rpy2" = "*"
+tables = "*"
 
 
 [dev-packages]

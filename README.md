@@ -14,12 +14,13 @@ and dependency packages.
 
 ### Makefile
 
-I provided [Makefile](Makefile) for convinient commands implementation.  
+I provide [Makefile](Makefile) for convinient commands implementation.  
 Run `make help` for get info on that.
 
 ### Prerequisites
 
 * **R**>=3.4.2
+* **forecast** package as python wrapper for R stl funcs (is't on PyPi)
 
 ## Usage
 
