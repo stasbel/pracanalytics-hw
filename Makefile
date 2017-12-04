@@ -1,3 +1,4 @@
+
 # This Makefile provide some useful commands for developing and using this
 # project. Remeber, this is just for the convinience, so dont rely on them
 # too much. You can do all sort of things (including running and using code)
@@ -11,6 +12,7 @@
 # Basic prologue mashinery from the Makefile style guide
 MAKEFLAGS += --warn-undefined-variables
 SHELL := bash
+THIS_FILE := $(lastword $(MAKEFILE_LIST))
 .SHELLFLAGS := -eu -o pipefail -c
 .DEFAULT_GOAL := all
 .DELETE_ON_ERROR:
@@ -63,28 +65,37 @@ reqs_dev_file := requirements-dev.txt
 reqs_file := requirements.txt
 py_files := $(shell find . -name "*.py" | cut -c 3-)
 
-install:	##@dev	Install project dependencies.
-	$(pip_tool) install --dev
+reqs_dev :=
+
+reqs:	##@dev	Install all project dependencies.
+	@$(pip_tool) install --dev
 
 check:	##@dev	Check project vulnerabilities and code style (pep + flake).
-	$(pip_tool) check
-	for file in $(py_files); do \
+	@$(pip_tool) check
+	@for file in $(py_files); do \
 		echo "check" $$file ; \
 		$(pip_tool) check --style $$file ; \
 	done
 	$(SUCCESS)
 
 lock:	##@dev	Lock currect env into specific files.
-	$(pip_tool) lock
-	$(pip_tool) lock -r -d >$(reqs_dev_file)
-	$(pip_tool) lock -r >$(reqs_file)
+	@echo 'Locking current enviroment using `$(pip_tool)`...'
+	@$(pip_tool) lock
+	@$(eval reqs_dev := $(shell $(pip_tool) lock -r -d))
+ifneq ($(strip $(reqs_dev)),)
+	@echo 'Saving devs requirements to `$(reqs_dev_file)`...'
+	@echo '$(reqs_dev)' >$(reqs_dev_file)
+endif
+	@echo 'Saving requirements to `$(reqs_file)`...'
+	@$(pip_tool) lock -r >$(reqs_file)
 	$(SUCCESS)
 
 # Basic
 
 clean:	##@basic	Do the cleaning, removing unnecessary files.
-	rm -rf *~ \#*
+	@echo 'Removing unnecessary files...'
+	@rm -rf *~ \#*
 
 ## PHONY TARGETS ##
 
-.PHONY: all help install check lock clean
+.PHONY: all help reqs check lock clean

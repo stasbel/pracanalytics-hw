@@ -6,15 +6,16 @@ Practical analytics course homework at SPbAU 7th term
 
 ### Dev
 
-I use [pipenv](https://docs.pipenv.org/) as a primary tool for development.  
+I'm use [pipenv](https://docs.pipenv.org/) as a primary tool for development.  
 See [Pipfile](Pipfile), [Pipfile.lock](Pipfile.lock), 
-[requirements-dev.txt](requirements-dev.txt) and
-[requirements.txt](requirements.txt) for full specification of platform, python
-and dependency packages.
+[requirements-dev.txt](requirements-dev.txt)(if any) and
+[requirements.txt](requirements.txt) for full specification of 
+platform, python
+and dependency packages needed to build, run and test this project.
 
 ### Makefile
 
-I provide [Makefile](Makefile) for convinient commands implementation.  
+I'm provided [Makefile](Makefile) for convinient commands implementation.  
 Run `make help` for get info on that.
 
 ### Prerequisites
