@@ -15,6 +15,8 @@ seaborn = "*"
 statsmodels = "*"
 "rpy2" = "*"
 tables = "*"
+sklearn = "*"
+scipy = "*"
 
 
 [dev-packages]
