@@ -1,4 +1,3 @@
-
 # This Makefile provide some useful commands for developing and using this
 # project. Remeber, this is just for the convinience, so dont rely on them
 # too much. You can do all sort of things (including running and using code)
