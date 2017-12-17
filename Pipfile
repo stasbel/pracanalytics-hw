@@ -17,6 +17,8 @@ statsmodels = "*"
 tables = "*"
 sklearn = "*"
 scipy = "*"
+scrapy = "*"
+flask = "*"
 
 
 [dev-packages]
