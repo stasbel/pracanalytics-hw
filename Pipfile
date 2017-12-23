@@ -13,12 +13,13 @@ pandas = "*"
 matplotlib = "*"
 seaborn = "*"
 statsmodels = "*"
-"rpy2" = "*"
 tables = "*"
 sklearn = "*"
 scipy = "*"
 scrapy = "*"
 flask = "*"
+"rpy2" = "*"
+tqdm = "*"
 
 
 [dev-packages]
